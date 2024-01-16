@@ -12,7 +12,9 @@ package llm
 #cgo darwin LDFLAGS: -framework Foundation -framework Metal -framework MetalKit -framework MetalPerformanceShaders
 #cgo linux CFLAGS: -D_GNU_SOURCE
 #cgo linux LDFLAGS: -lrt -ldl -lstdc++ -lm
-#cgo linux windows LDFLAGS: -lpthread
+#cgo openbsd CFLAGS: -D_BSD_SOURCE
+#cgo openbsd LDFLAGS: -lrt -lstdc++ -lm
+#cgo linux windows openbsd LDFLAGS: -lpthread
 
 #include <stdlib.h>
 #include "dyn_ext_server.h"

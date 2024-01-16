@@ -6,7 +6,7 @@ import (
 	"syscall"
 )
 
-type Termios syscall.Termios
+type Termios = syscall.Termios
 
 func SetRawMode(fd int) (*Termios, error) {
 	termios, err := getTermios(fd)

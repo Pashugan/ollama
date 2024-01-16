@@ -1,4 +1,13 @@
-# common logic accross linux and darwin
+# common logic across Linux, Darwin and BSD
+
+if [ -z "${CC}" ]; then
+    export CC=$(command -v gcc)
+fi
+if [ -z "${CXX}" ]; then
+    export CXX=$(command -v g++)
+fi
+
+LLAMACPP_DIR=../llama.cpp
 
 init_vars() {
     case "${GOARCH}" in
@@ -12,7 +21,6 @@ init_vars() {
         ARCH=$(uname -m | sed -e "s/aarch64/arm64/g")
     esac
 
-    LLAMACPP_DIR=../llama.cpp
     CMAKE_DEFS=""
     CMAKE_TARGETS="--target ext_server"
     if echo "${CGO_CFLAGS}" | grep -- '-g' >/dev/null; then
@@ -36,6 +44,12 @@ init_vars() {
         # Cross compiling not supported on linux - Use docker
         GCC_ARCH=""
         ;;
+    "OpenBSD")
+        LIB_EXT="so"
+        WHOLE_ARCHIVE="-Wl,--whole-archive"
+        NO_WHOLE_ARCHIVE="-Wl,--no-whole-archive"
+        GCC_ARCH=""
+        ;;
     *)
         ;;
     esac
@@ -56,7 +70,6 @@ git_module_setup() {
     fi
     git submodule init
     git submodule update --force ${LLAMACPP_DIR}
-
 }
 
 apply_patches() {
@@ -69,11 +82,11 @@ apply_patches() {
         # apply temporary patches until fix is upstream
         for patch in ../patches/*.diff; do
             for file in $(grep "^+++ " ${patch} | cut -f2 -d' ' | cut -f2- -d/); do
-                (cd ${LLAMACPP_DIR}; git checkout ${file})
+                git -C ${LLAMACPP_DIR} checkout ${file}
             done
         done
         for patch in ../patches/*.diff; do
-            (cd ${LLAMACPP_DIR} && git apply ${patch})
+            git -C ${LLAMACPP_DIR} apply ${patch}
         done
     fi
 
@@ -86,7 +99,7 @@ build() {
     cmake -S ${LLAMACPP_DIR} -B ${BUILD_DIR} ${CMAKE_DEFS}
     cmake --build ${BUILD_DIR} ${CMAKE_TARGETS} -j8
     mkdir -p ${BUILD_DIR}/lib/
-    g++ -fPIC -g -shared -o ${BUILD_DIR}/lib/libext_server.${LIB_EXT} \
+    ${CC} -fPIC -g -shared -o ${BUILD_DIR}/lib/libext_server.${LIB_EXT} \
         ${GCC_ARCH} \
         ${WHOLE_ARCHIVE} ${BUILD_DIR}/examples/server/libext_server.a ${NO_WHOLE_ARCHIVE} \
         ${BUILD_DIR}/common/libcommon.a \
@@ -102,7 +115,7 @@ compress_libs() {
     rm -rf ${BUILD_DIR}/lib/*.${LIB_EXT}*.gz
     for lib in ${BUILD_DIR}/lib/*.${LIB_EXT}* ; do
         gzip --best -f ${lib} &
-        pids+=" $!"
+        pids="$pids $!"
     done
     echo 
     for pid in ${pids}; do
@@ -113,12 +126,12 @@ compress_libs() {
 
 # Keep the local tree clean after we're done with the build
 cleanup() {
-    (cd ${LLAMACPP_DIR}/examples/server/ && git checkout CMakeLists.txt server.cpp)
+    git -C "${LLAMACPP_DIR}/examples/server" checkout CMakeLists.txt server.cpp
 
     if [ -n "$(ls -A ../patches/*.diff)" ]; then
         for patch in ../patches/*.diff; do
-            for file in $(grep "^+++ " ${patch} | cut -f2 -d' ' | cut -f2- -d/); do
-                (cd ${LLAMACPP_DIR}; git checkout ${file})
+            for file in $(grep "^+++ " "${patch}" | cut -f2 -d' ' | cut -f2- -d/); do
+                git -C "${LLAMACPP_DIR}" checkout "${file}"
             done
         done
     fi

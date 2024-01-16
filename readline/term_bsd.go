@@ -3,23 +3,35 @@
 package readline
 
 import (
-	"syscall"
-	"unsafe"
+	"golang.org/x/sys/unix"
 )
 
 func getTermios(fd int) (*Termios, error) {
-	termios := new(Termios)
-	_, _, err := syscall.Syscall6(syscall.SYS_IOCTL, uintptr(fd), syscall.TIOCGETA, uintptr(unsafe.Pointer(termios)), 0, 0, 0)
-	if err != 0 {
+	tos, err := unix.IoctlGetTermios(fd, unix.TIOCGETA)
+	if err != nil {
 		return nil, err
 	}
-	return termios, nil
+	return &Termios{
+		Iflag:  tos.Iflag,
+		Oflag:  tos.Oflag,
+		Cflag:  tos.Cflag,
+		Lflag:  tos.Lflag,
+		Cc:     tos.Cc,
+		Ispeed: tos.Ispeed,
+		Ospeed: tos.Ospeed,
+	}, nil
 }
 
 func setTermios(fd int, termios *Termios) error {
-	_, _, err := syscall.Syscall6(syscall.SYS_IOCTL, uintptr(fd), syscall.TIOCSETA, uintptr(unsafe.Pointer(termios)), 0, 0, 0)
-	if err != 0 {
-		return err
+	tos := &unix.Termios{
+		Iflag:  termios.Iflag,
+		Oflag:  termios.Oflag,
+		Cflag:  termios.Cflag,
+		Lflag:  termios.Lflag,
+		Cc:     termios.Cc,
+		Ispeed: termios.Ispeed,
+		Ospeed: termios.Ospeed,
 	}
-	return nil
+	err := unix.IoctlSetTermios(fd, unix.TIOCGETA, tos)
+	return err
 }

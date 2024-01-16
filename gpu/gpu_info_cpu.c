@@ -40,6 +40,11 @@ void cpu_check_ram(mem_info_t *resp) {
 //   mem_info_t resp = {0, 0, NULL};
 //   return resp;
 // }
+#elif __unix__
+#include <sys/param.h>
+#if BSD
+// TODO consider BSD implementation that does something useful
+#endif
 #else
 #error "Unsupported platform"
 #endif
